@@ -10,20 +10,37 @@ window.onload = function () {
     document.getElementById('error-message').textContent = 'Invalid PDF link.';
   }
 
-  // Signature pad setup
+  // Signature pad setup with mouse and touch support
   const canvas = document.getElementById('signature-pad');
   const ctx = canvas.getContext('2d');
   let drawing = false;
 
+  function getPos(e) {
+    if (e.touches && e.touches.length > 0) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: e.touches[0].clientX - rect.left,
+        y: e.touches[0].clientY - rect.top
+      };
+    } else {
+      return {
+        x: e.offsetX,
+        y: e.offsetY
+      };
+    }
+  }
+
   canvas.addEventListener('mousedown', function (e) {
     drawing = true;
+    const pos = getPos(e);
     ctx.beginPath();
-    ctx.moveTo(e.offsetX, e.offsetY);
+    ctx.moveTo(pos.x, pos.y);
   });
 
   canvas.addEventListener('mousemove', function (e) {
     if (drawing) {
-      ctx.lineTo(e.offsetX, e.offsetY);
+      const pos = getPos(e);
+      ctx.lineTo(pos.x, pos.y);
       ctx.stroke();
     }
   });
@@ -36,12 +53,33 @@ window.onload = function () {
     drawing = false;
   });
 
+  canvas.addEventListener('touchstart', function (e) {
+    e.preventDefault();
+    drawing = true;
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+  });
+
+  canvas.addEventListener('touchmove', function (e) {
+    e.preventDefault();
+    if (drawing) {
+      const pos = getPos(e);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+    }
+  });
+
+  canvas.addEventListener('touchend', function () {
+    drawing = false;
+  });
+
   document.getElementById('clear-btn').addEventListener('click', function () {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   });
 
   document.getElementById('sign-upload-btn').addEventListener('click', async function () {
-    const recipientId = pdfPath.split('/')[1]; // folder name as ID
+    const recipientId = pdfPath.split('/')[1];
 
     canvas.toBlob(async function (blob) {
       const formData = new FormData();
@@ -49,7 +87,7 @@ window.onload = function () {
       formData.append('signed_pdf', blob, `${recipientId}.png`);
 
       try {
-        const response = await fetch('https://n8n.apdi.site/webhook-test/signed-upload', {
+        const response = await fetch('https://your-n8n-domain/webhook/signed-upload', {
           method: 'POST',
           body: formData
         });
