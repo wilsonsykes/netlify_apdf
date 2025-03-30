@@ -1,23 +1,31 @@
-window.onload = function () {
+window.onload = async function () {
   const urlParams = new URLSearchParams(window.location.search);
   const pdfPath = urlParams.get('pdf');
 
-  if (pdfPath) {
-    const iframe = document.getElementById('pdf-frame');
-    iframe.src = `https://docs.google.com/gview?url=https://apdf2025.netlify.app${pdfPath}&embedded=true`;
-    iframe.style.display = 'block';
-  } else {
+  if (!pdfPath) {
     document.getElementById('error-message').textContent = 'Invalid PDF link.';
+    return;
   }
 
-  // Signature pad setup with mouse and touch support
+  const pdfUrl = `https://apdf2025.netlify.app${pdfPath}`;
+  let originalPdfBytes;
+
+  try {
+    const res = await fetch(pdfUrl);
+    originalPdfBytes = await res.arrayBuffer();
+  } catch (err) {
+    document.getElementById('error-message').textContent = 'Failed to load PDF.';
+    return;
+  }
+
   const canvas = document.getElementById('signature-pad');
   const ctx = canvas.getContext('2d');
   let drawing = false;
 
+  // Drawing support for mouse and touch
   function getPos(e) {
-    if (e.touches && e.touches.length > 0) {
-      const rect = canvas.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
+    if (e.touches) {
       return {
         x: e.touches[0].clientX - rect.left,
         y: e.touches[0].clientY - rect.top
@@ -30,14 +38,14 @@ window.onload = function () {
     }
   }
 
-  canvas.addEventListener('mousedown', function (e) {
+  canvas.addEventListener('mousedown', (e) => {
     drawing = true;
     const pos = getPos(e);
     ctx.beginPath();
     ctx.moveTo(pos.x, pos.y);
   });
 
-  canvas.addEventListener('mousemove', function (e) {
+  canvas.addEventListener('mousemove', (e) => {
     if (drawing) {
       const pos = getPos(e);
       ctx.lineTo(pos.x, pos.y);
@@ -45,15 +53,10 @@ window.onload = function () {
     }
   });
 
-  canvas.addEventListener('mouseup', function () {
-    drawing = false;
-  });
+  canvas.addEventListener('mouseup', () => drawing = false);
+  canvas.addEventListener('mouseleave', () => drawing = false);
 
-  canvas.addEventListener('mouseleave', function () {
-    drawing = false;
-  });
-
-  canvas.addEventListener('touchstart', function (e) {
+  canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
     drawing = true;
     const pos = getPos(e);
@@ -61,7 +64,7 @@ window.onload = function () {
     ctx.moveTo(pos.x, pos.y);
   });
 
-  canvas.addEventListener('touchmove', function (e) {
+  canvas.addEventListener('touchmove', (e) => {
     e.preventDefault();
     if (drawing) {
       const pos = getPos(e);
@@ -70,35 +73,55 @@ window.onload = function () {
     }
   });
 
-  canvas.addEventListener('touchend', function () {
-    drawing = false;
-  });
+  canvas.addEventListener('touchend', () => drawing = false);
 
-  document.getElementById('clear-btn').addEventListener('click', function () {
+  document.getElementById('clear-btn').addEventListener('click', () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   });
 
-  document.getElementById('sign-upload-btn').addEventListener('click', async function () {
+  document.getElementById('sign-upload-btn').addEventListener('click', async () => {
     const recipientId = pdfPath.split('/')[1];
 
-    canvas.toBlob(async function (blob) {
-      const formData = new FormData();
-      formData.append('recipient_id', recipientId);
-      formData.append('signed_pdf', blob, `${recipientId}.png`);
+    canvas.toBlob(async (blob) => {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const signatureBytes = new Uint8Array(reader.result);
+        const { PDFDocument, rgb } = window.pdfLib;
 
-      try {
-        const response = await fetch('https://n8n.apdi2025.site/webhook-test/signed-upload', {
-          method: 'POST',
-          body: formData
+        const pdfDoc = await PDFDocument.load(originalPdfBytes);
+        const page = pdfDoc.getPages()[0];
+
+        const signatureImage = await pdfDoc.embedPng(signatureBytes);
+        const dims = signatureImage.scale(0.5);
+        page.drawImage(signatureImage, {
+          x: 50,
+          y: 100,
+          width: dims.width,
+          height: dims.height
         });
 
-        const result = await response.json();
-        alert('Signature submitted successfully!');
-        console.log(result);
-      } catch (err) {
-        console.error('Error uploading signed image:', err);
-        alert('Upload failed.');
-      }
+        const signedPdfBytes = await pdfDoc.save();
+        const signedBlob = new Blob([signedPdfBytes], { type: 'application/pdf' });
+
+        const formData = new FormData();
+        formData.append('recipient_id', recipientId);
+        formData.append('signed_pdf', signedBlob, `${recipientId}.pdf`);
+
+        try {
+          const res = await fetch('https://n8n.apdi2025.site/webhook/signed-upload', {
+            method: 'POST',
+            body: formData
+          });
+          const result = await res.json();
+          alert('Signed PDF uploaded successfully!');
+          console.log(result);
+        } catch (err) {
+          console.error('Upload failed:', err);
+          alert('Failed to upload signed PDF.');
+        }
+      };
+
+      reader.readAsArrayBuffer(blob);
     }, 'image/png');
   });
 };
