@@ -1,42 +1,125 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PDF Signature</title>
+window.onload = function () {
+  const urlParams = new URLSearchParams(window.location.search);
+  const pdfPath = urlParams.get('pdf');
+  const fullPdfUrl = `https://apdf2025.netlify.app${pdfPath}`;
+  const recipientId = pdfPath.split('/')[1];
 
-  <!-- Styles -->
-  <link rel="stylesheet" href="styles.css" />
+  // Display PDF in iframe
+  if (pdfPath) {
+    const iframe = document.getElementById('pdf-frame');
+    iframe.src = `https://docs.google.com/gview?url=${fullPdfUrl}&embedded=true`;
+    iframe.style.display = 'block';
+  } else {
+    document.getElementById('error-message').textContent = 'Invalid PDF link.';
+  }
 
-  <!-- PDF.js (for rendering PDF) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+  // --- Signature Pad ---
+  const canvas = document.getElementById('signature-pad');
+  const ctx = canvas.getContext('2d');
+  let drawing = false;
 
-  <!-- pdf-lib (for future embedded signature into PDF) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-</head>
-<body>
-  <div class="container">
-    <h1>📝 Please Review and Sign Your Document</h1>
-    <p>Your document is shown below. Please review and sign using the canvas below.</p>
+  function getPos(e) {
+    if (e.touches && e.touches.length > 0) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: e.touches[0].clientX - rect.left,
+        y: e.touches[0].clientY - rect.top
+      };
+    } else {
+      return {
+        x: e.offsetX,
+        y: e.offsetY
+      };
+    }
+  }
 
-    <!-- PDF iframe -->
-    <iframe id="pdf-frame" src="" frameborder="0"></iframe>
+  function stopDrawing() {
+    drawing = false;
+  }
 
-    <h3>Sign below:</h3>
-    <canvas id="signature-pad"></canvas>
+  canvas.addEventListener('mousedown', (e) => {
+    drawing = true;
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+  });
+  canvas.addEventListener('mousemove', (e) => {
+    if (drawing) {
+      const pos = getPos(e);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+    }
+  });
+  canvas.addEventListener('mouseup', stopDrawing);
+  canvas.addEventListener('mouseleave', stopDrawing);
 
-    <div>
-      <button id="clear-btn">Clear</button>
-      <button id="sign-upload-btn">Sign & Upload</button>
-    </div>
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    drawing = true;
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+  });
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (drawing) {
+      const pos = getPos(e);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+    }
+  });
+  canvas.addEventListener('touchend', stopDrawing);
 
-    <div id="error-message"></div>
-  </div>
+  // Clear button
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  });
 
-  <!-- PDF-lib Library (must come first) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  // Sign & Upload button
+  document.getElementById('sign-upload-btn').addEventListener('click', async () => {
+    canvas.toBlob(async (signatureBlob) => {
+      try {
+        // Step 1: Load the original PDF
+        const existingPdfBytes = await fetch(fullPdfUrl).then(res => res.arrayBuffer());
 
-  <!-- Main JS Script -->
-<script src="script.js"></script>
-</body>
-</html>
+        // Step 2: Read the signature from the canvas
+        const signatureDataURL = canvas.toDataURL('image/png');
+        const signatureImageBytes = await fetch(signatureDataURL).then(res => res.arrayBuffer());
+
+        // Step 3: Embed signature into PDF
+        const pdfDoc = await window.pdfLib.PDFDocument.load(existingPdfBytes);
+        const pngImage = await pdfDoc.embedPng(signatureImageBytes);
+        const pngDims = pngImage.scale(0.5);
+        const page = pdfDoc.getPage(0);
+
+        // Position signature at bottom-right
+        page.drawImage(pngImage, {
+          x: page.getWidth() - pngDims.width - 50,
+          y: 50,
+          width: pngDims.width,
+          height: pngDims.height,
+        });
+
+        const signedPdfBytes = await pdfDoc.save();
+
+        // Step 4: Upload to n8n webhook
+        const signedBlob = new Blob([signedPdfBytes], { type: 'application/pdf' });
+        const formData = new FormData();
+        formData.append('recipient_id', recipientId);
+        formData.append('signed_pdf', signedBlob, `${recipientId}.pdf`);
+
+        const response = await fetch('https://n8n.apdi2025.site/webhook/signed-upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        const result = await response.json();
+        alert('Signed PDF submitted successfully!');
+        console.log(result);
+      } catch (err) {
+        console.error('Upload failed:', err);
+        alert('Upload failed.');
+      }
+    }, 'image/png');
+  });
+};
