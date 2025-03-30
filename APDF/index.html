@@ -30,74 +30,7 @@
     <div id="error-message"></div>
   </div>
 
-  <script>
-    const canvas = document.getElementById('signature-pad');
-    const ctx = canvas.getContext('2d');
-    let drawing = false;
-
-    function resizeCanvas() {
-      canvas.width = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
-    }
-
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-
-    canvas.addEventListener('mousedown', e => {
-      drawing = true;
-      ctx.beginPath();
-      ctx.moveTo(e.offsetX, e.offsetY);
-    });
-
-    canvas.addEventListener('mousemove', e => {
-      if (drawing) {
-        ctx.lineTo(e.offsetX, e.offsetY);
-        ctx.stroke();
-      }
-    });
-
-    canvas.addEventListener('mouseup', () => drawing = false);
-    canvas.addEventListener('mouseleave', () => drawing = false);
-
-    document.getElementById('clear-btn').addEventListener('click', () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    });
-
-    document.getElementById('sign-upload-btn').addEventListener('click', async () => {
-      const recipientId = new URLSearchParams(window.location.search).get('pdf').split("/")[1];
-      canvas.toBlob(async function (blob) {
-        const formData = new FormData();
-        formData.append('recipient_id', recipientId);
-        formData.append('signed_pdf', blob, `${recipientId}.png`);
-
-        try {
-          const response = await fetch('https://n8n.apdi2025.site/webhook/signed-upload', {
-            method: 'POST',
-            body: formData
-          });
-
-          const result = await response.json();
-          alert('Signature submitted successfully!');
-          console.log(result);
-        } catch (err) {
-          console.error('Error uploading signed image:', err);
-          alert('Upload failed.');
-        }
-      }, 'image/png');
-    });
-
-    window.onload = function () {
-      const urlParams = new URLSearchParams(window.location.search);
-      const pdfPath = urlParams.get('pdf');
-
-      if (pdfPath) {
-        const iframe = document.getElementById('pdf-frame');
-        iframe.src = `https://docs.google.com/gview?url=https://apdf2025.netlify.app${pdfPath}&embedded=true`;
-        iframe.style.display = 'block';
-      } else {
-        document.getElementById('error-message').textContent = 'Invalid PDF link.';
-      }
-    };
-  </script>
+  <!-- Load your JavaScript file -->
+  <script src="script.js"></script>
 </body>
 </html>
