@@ -6,7 +6,7 @@ window.onload = function () {
   if (pdfPath) {
     // Show the PDF inside an iframe using Google Docs Viewer
     const iframe = document.getElementById('pdf-frame');
-    iframe.src = `pdfjs/web/viewer.html?file=https://raw.githubusercontent.com/wilsonsykes/netlify_apdf/main${pdfPath}`;
+    iframe.src = `pdfjs/web/viewer.html?file=${pdfPath}`;
     iframe.style.display = 'block';
   } else {
     // If no PDF was provided, display an error
