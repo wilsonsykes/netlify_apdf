@@ -1,0 +1,4 @@
+[[redirects]]
+  from = "/APDF/*"
+  to = "/APDF/:splat"
+  status = 200
