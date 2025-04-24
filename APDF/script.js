@@ -89,26 +89,23 @@ window.onload = function () {
       const pdfBytes = await fetch(fullPdfUrl).then(res => res.arrayBuffer());
 
       canvas.toBlob(async (signatureBlob) => {
-      const signatureImageBytes = await signatureBlob.arrayBuffer();
-    
-      const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
-      const signatureImage = await pdfDoc.embedPng(signatureImageBytes);
-      const signatureDims = signatureImage.scale(0.5);
-    
-      const pages = pdfDoc.getPages();
-      const lastPage = pages[pages.length - 1];  // 👈 Target the last page
-    
-      lastPage.drawImage(signatureImage, {
-        x: 400,  // Adjust to your preferred spot
-        y: 50,
-        width: signatureDims.width,
-        height: signatureDims.height
-      });
-    
-      const signedPdfBytes = await pdfDoc.save();
-    
+        const signatureImageBytes = await signatureBlob.arrayBuffer();
+      
+        const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+        const signatureImage = await pdfDoc.embedPng(signatureImageBytes);
+        const signatureDims = signatureImage.scale(0.5);
+      
+        const pages = pdfDoc.getPages();
+        const lastPage = pages[pages.length - 1];  // 👈 Target the last page
+      
+        lastPage.drawImage(signatureImage, {
+          x: 400,  // Adjust to your preferred spot
+          y: 50,
+          width: signatureDims.width,
+          height: signatureDims.height
+        });
 
-
+    
         const signedPdfBytes = await pdfDoc.save();
 
         const formData = new FormData();
