@@ -112,7 +112,7 @@ window.onload = function () {
         formData.append('recipient_id', recipientId);
         formData.append('signed_pdf', new Blob([signedPdfBytes], { type: 'application/pdf' }), `${recipientId}_signed.pdf`);
 
-        const response = await fetch('https://n8n.apdi2025.site/webhook-test/signed-upload', {
+        const response = await fetch('https://n8n.apdi2025.site/webhook/signed-upload', {
           method: 'POST',
           body: formData
         });
