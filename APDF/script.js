@@ -1,20 +1,20 @@
 window.onload = function () {
-  // Extract the 'pdf' parameter from the URL (used to locate the PDF file)
+  // === Step 1: Get PDF Path from URL ===
   const urlParams = new URLSearchParams(window.location.search);
   const pdfPath = urlParams.get('pdf');
 
   if (pdfPath) {
-    // ✅ Load PDF from Netlify-hosted path into embedded PDF.js viewer
+    // ✅ Build full URL to Netlify-hosted PDF and load it in PDF.js viewer
     const iframe = document.getElementById('pdf-frame');
-    iframe.src = `pdfjs/web/viewer.html?file=${pdfPath}`;
+    const fullPdfUrl = `${window.location.origin}${pdfPath}`;
+    iframe.src = `pdfjs/web/viewer.html?file=${encodeURIComponent(fullPdfUrl)}`;
     iframe.style.display = 'block';
   } else {
-    // If no PDF was provided, display an error
     document.getElementById('error-message').textContent = 'Invalid PDF link.';
     return;
   }
 
-  // ==== Signature Pad Setup (Canvas) ====
+  // === Step 2: Signature Pad Setup ===
   const canvas = document.getElementById('signature-pad');
   const ctx = canvas.getContext('2d');
   let drawing = false;
@@ -75,10 +75,10 @@ window.onload = function () {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   });
 
-  // ==== Sign & Upload Logic ====
+  // === Step 3: Sign & Upload PDF ===
   document.getElementById('sign-upload-btn').addEventListener('click', async () => {
-    const recipientId = pdfPath.split('/')[2]; // Extract the PSID from the PDF path
-    const originalPdfUrl = pdfPath; // Use relative Netlify path
+    const recipientId = pdfPath.split('/')[2]; // Extract ID from /APDF/{id}/{id}.pdf
+    const fullPdfUrl = `${window.location.origin}${pdfPath}`;
 
     try {
       const PDFDocument = window.PDFLib.PDFDocument;
@@ -86,7 +86,7 @@ window.onload = function () {
 
       if (!PDFDocument) throw new Error("PDF-lib not loaded.");
 
-      const pdfBytes = await fetch(originalPdfUrl).then(res => res.arrayBuffer());
+      const pdfBytes = await fetch(fullPdfUrl).then(res => res.arrayBuffer());
 
       canvas.toBlob(async (signatureBlob) => {
         const signatureImageBytes = await signatureBlob.arrayBuffer();
