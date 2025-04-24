@@ -89,20 +89,25 @@ window.onload = function () {
       const pdfBytes = await fetch(fullPdfUrl).then(res => res.arrayBuffer());
 
       canvas.toBlob(async (signatureBlob) => {
-        const signatureImageBytes = await signatureBlob.arrayBuffer();
+      const signatureImageBytes = await signatureBlob.arrayBuffer();
+    
+      const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+      const signatureImage = await pdfDoc.embedPng(signatureImageBytes);
+      const signatureDims = signatureImage.scale(0.5);
+    
+      const pages = pdfDoc.getPages();
+      const lastPage = pages[pages.length - 1];  // 👈 Target the last page
+    
+      lastPage.drawImage(signatureImage, {
+        x: 400,  // Adjust to your preferred spot
+        y: 50,
+        width: signatureDims.width,
+        height: signatureDims.height
+      });
+    
+      const signedPdfBytes = await pdfDoc.save();
+    
 
-        const pdfDoc = await PDFDocument.load(pdfBytes);
-        const signatureImage = await pdfDoc.embedPng(signatureImageBytes);
-        const signatureDims = signatureImage.scale(0.5);
-
-        const pages = pdfDoc.getPages();
-        const firstPage = pages[0];
-        firstPage.drawImage(signatureImage, {
-          x: 50,
-          y: 50,
-          width: signatureDims.width,
-          height: signatureDims.height
-        });
 
         const signedPdfBytes = await pdfDoc.save();
 
@@ -110,7 +115,7 @@ window.onload = function () {
         formData.append('recipient_id', recipientId);
         formData.append('signed_pdf', new Blob([signedPdfBytes], { type: 'application/pdf' }), `${recipientId}_signed.pdf`);
 
-        const response = await fetch('https://n8n.apdi2025.site/webhook-test/signed-upload', {
+        const response = await fetch('https://n8n.apdi2025.site/webhook/signed-upload', {
           method: 'POST',
           body: formData
         });
